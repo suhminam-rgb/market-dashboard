@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>마켓 대시보드</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #f6f7f9; --card: #ffffff; --text: #1b1f24; --muted: #6b7280; --line: #e5e7eb;
+  --up: #d93025; --down: #1a66d9; --accent: #3b5bdb; --chip: #eef1f6;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0f1216; --card: #171b21; --text: #e6e8eb; --muted: #8b939e; --line: #262c35;
+    --up: #ff6b5f; --down: #5b9bff; --accent: #7b93ff; --chip: #222833; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.5 "Noto Sans KR", system-ui, sans-serif; }
+header { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+.wrap { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
+.top { display: flex; align-items: center; justify-content: space-between; padding: 12px 0 6px; gap: 8px; }
+h1 { font-size: 18px; margin: 0; }
+#updated { color: var(--muted); font-size: 12px; }
+nav { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 8px; }
+nav button { border: 0; background: transparent; color: var(--muted); padding: 6px 12px; border-radius: 999px;
+  font: inherit; cursor: pointer; white-space: nowrap; }
+nav button.on { background: var(--text); color: var(--bg); }
+main { padding: 16px 0 40px; }
+section { display: none; } section.on { display: block; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+.card h2 { font-size: 15px; margin: 0 0 10px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.card h2 small { color: var(--muted); font-weight: 400; font-size: 12px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.tile { border: 1px solid var(--line); border-radius: 10px; padding: 10px; cursor: pointer; background: var(--card); text-align: left; font: inherit; color: inherit; }
+.tile.on { outline: 2px solid var(--accent); }
+.tile .k { color: var(--muted); font-size: 12px; }
+.tile .v { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.up { color: var(--up); } .down { color: var(--down); }
+.chartbox { position: relative; height: 260px; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { padding: 7px 6px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+th { color: var(--muted); font-weight: 500; font-size: 12px; }
+th:nth-child(-n+2), td:nth-child(-n+2) { text-align: left; }
+td.name { cursor: pointer; white-space: normal; } td.name:hover { color: var(--accent); }
+.scroll { overflow-x: auto; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--text); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { background: var(--chip); border-radius: 999px; padding: 4px 10px; font-size: 13px; cursor: pointer; border: 0; color: inherit; font: inherit; }
+.chip b { margin-left: 4px; }
+.news a { color: inherit; text-decoration: none; font-weight: 500; } .news a:hover { color: var(--accent); }
+.news li { margin-bottom: 10px; } .news p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+.news ol { padding-left: 20px; margin: 0; }
+.empty { color: var(--muted); padding: 8px 0; }
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+@media (max-width: 720px) { .two { grid-template-columns: minmax(0, 1fr); } }
+.bar { display: grid; grid-template-columns: 110px 1fr 64px; gap: 8px; align-items: center; margin: 4px 0; font-size: 13px; }
+.bar .track { height: 10px; position: relative; }
+.bar .fill { position: absolute; top: 0; height: 100%; border-radius: 3px; }
+.bar .mid { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--line); }
+.bar span:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div class="top"><h1>📊 마켓 대시보드</h1><span id="updated"></span></div>
+  <nav id="tabs">
+    <button data-t="ind" class="on">지표</button>
+    <button data-t="rank">순위</button>
+    <button data-t="us">미국장</button>
+    <button data-t="news">뉴스</button>
+    <button data-t="ipo">공모주</button>
+  </nav>
+</div></header>
+
+<main class="wrap">
+  <section id="ind" class="on">
+    <div class="card"><h2>아침 브리핑 지표 <small id="ind-ts"></small></h2><div class="grid" id="ind-tiles"></div></div>
+    <div class="card"><h2><span id="ind-chart-title">추이</span><small>브리핑 시점 기준</small></h2><div class="chartbox"><canvas id="ind-chart"></canvas></div></div>
+  </section>
+
+  <section id="rank">
+    <div class="card">
+      <div class="row">
+        <select id="rank-kind"></select>
+        <select id="rank-snap"></select>
+      </div>
+      <div class="scroll"><table id="rank-table"></table></div>
+    </div>
+    <div class="two">
+      <div class="card"><h2>자주 등장한 종목 <small id="freq-sub"></small></h2><div class="chips" id="freq"></div></div>
+      <div class="card"><h2><span id="rank-chart-title">종목 순위 추이</span><small>종목명을 누르세요</small></h2><div class="chartbox"><canvas id="rank-chart"></canvas></div></div>
+    </div>
+  </section>
+
+  <section id="us">
+    <div class="card"><h2>미국증시 마감 코멘트 <small id="us-ts"></small></h2><p id="us-comment"></p></div>
+    <div class="two">
+      <div class="card"><h2>지수 등락률</h2><div id="us-idx"></div></div>
+      <div class="card"><h2>테마 등락률</h2><div id="us-themes"></div></div>
+    </div>
+    <div class="card"><h2>지수 등락률 추이</h2><div class="chartbox"><canvas id="us-chart"></canvas></div></div>
+  </section>
+
+  <section id="news">
+    <div class="row"><select id="news-snap"></select></div>
+    <div id="news-body"></div>
+  </section>
+
+  <section id="ipo">
+    <div class="card"><h2>📋 상장대기 <small id="ipo-ts"></small></h2><div class="scroll"><table id="ipo-wait"></table></div></div>
+    <div class="card"><h2>🗓 청약예정</h2><div class="scroll"><table id="ipo-up"></table></div></div>
+  </section>
+</main>
+
+<script>
+const KINDS = ["briefing", "market_cap", "trading_value", "popular", "week52", "nxt_movers", "ipo",
+  "us_market", "news_FLASHNEWS", "news_MAINNEWS", "news_RANKNEWS"];
+const IND_LABELS = { kospi: "코스피", kosdaq: "코스닥", dow: "다우존스", nasdaq: "나스닥", sp500: "S&P500",
+  sox: "필라델피아반도체", us10y: "미국채10년(%)", wti: "WTI($)", gold: "금($)", vix: "VIX", usdkrw: "원/달러",
+  dxy: "달러인덱스", fear_greed: "Fear & Greed", btc_dominance: "BTC 도미넌스(%)" };
+const RANKS = [
+  ["market_cap", "시가총액 TOP 10", d => d, "market_cap", "시가총액"],
+  ["trading_value", "거래대금 · 코스피", d => d["코스피"], "trade_amount", "거래대금"],
+  ["trading_value", "거래대금 · 코스닥", d => d["코스닥"], "trade_amount", "거래대금"],
+  ["popular", "인기 종목", d => d, "volume", "거래량"],
+  ["week52", "52주 신고가", d => d.high, "week52_high", "52주최고"],
+  ["week52", "52주 신저가", d => d.low, "week52_low", "52주최저"],
+  ["nxt_movers", "NXT 급등", d => d.up, "trade_amount", "거래대금"],
+  ["nxt_movers", "NXT 급락", d => d.down, "trade_amount", "거래대금"],
+];
+const NEWS = [["news_FLASHNEWS", "🚨 실시간 속보"], ["news_MAINNEWS", "📰 주요 뉴스"], ["news_RANKNEWS", "🔥 많이 본 뉴스"]];
+
+let D = {}, indKey = "kospi", rankStock = null;
+const charts = {};
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const cls = v => v == null ? "" : v >= 0 ? "up" : "down";
+const pct = v => v == null ? "" : (v >= 0 ? "+" : "") + v.toFixed(2) + "%";
+const num = (v, d = 2) => v == null ? "-" : Number(v).toLocaleString("ko-KR", { maximumFractionDigits: d });
+const fmtTs = ts => ts ? ts.slice(5, 10).replace("-", "/") + " " + ts.slice(11, 16) : "";
+const amount = w => w >= 1e12 ? (w / 1e12).toFixed(2) + "조" : w >= 1e8 ? Math.round(w / 1e8).toLocaleString() + "억" : num(w, 0);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+async function load() {
+  const t = Date.now();
+  const res = await Promise.all(KINDS.map(k =>
+    fetch(`data/${k}.json?t=${t}`).then(r => r.ok ? r.json() : []).catch(() => [])));
+  D = Object.fromEntries(KINDS.map((k, i) => [k, res[i]]));
+  const latest = KINDS.map(k => D[k].at(-1)?.ts).filter(Boolean).sort().at(-1);
+  $("updated").textContent = latest ? `최근 갱신 ${fmtTs(latest)}` : "데이터 없음";
+  renderInd(); renderRankSelectors(); renderUS(); renderNews(); renderIPO();
+}
+
+function lineChart(id, labels, datasets) {
+  charts[id]?.destroy();
+  const grid = css("--line"), muted = css("--muted");
+  charts[id] = new Chart($(id), {
+    type: "line", data: { labels, datasets },
+    options: { responsive: true, maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
+      plugins: { legend: { display: datasets.length > 1, labels: { color: muted, boxWidth: 12 } } },
+      scales: { x: { ticks: { color: muted, maxRotation: 0, autoSkip: true }, grid: { color: grid } },
+        y: { ticks: { color: muted, precision: datasets[0]?.reverseY ? 0 : undefined }, grid: { color: grid },
+          reverse: !!datasets[0]?.reverseY, min: datasets[0]?.reverseY ? 1 : undefined } } }
+  });
+}
+
+function renderInd() {
+  const hist = D.briefing, last = hist.at(-1);
+  if (!last) { $("ind-tiles").innerHTML = '<div class="empty">아직 데이터가 없어요.</div>'; return; }
+  $("ind-ts").textContent = fmtTs(last.ts);
+  $("ind-tiles").innerHTML = Object.entries(last.data).filter(([, v]) => v[0] != null).map(([k, [v, c]]) =>
+    `<button class="tile ${k === indKey ? "on" : ""}" data-k="${esc(k)}"><div class="k">${esc(IND_LABELS[k] || k)}</div>
+     <div class="v">${num(v)}</div><div class="${cls(c)}">${pct(c)}</div></button>`).join("");
+  $("ind-tiles").querySelectorAll(".tile").forEach(b => b.onclick = () => { indKey = b.dataset.k; renderInd(); });
+  $("ind-chart-title").textContent = `${IND_LABELS[indKey] || indKey} 추이`;
+  lineChart("ind-chart", hist.map(s => fmtTs(s.ts).slice(0, 5)),
+    [{ data: hist.map(s => s.data[indKey]?.[0] ?? null), borderColor: css("--accent"), tension: .25, pointRadius: 2, spanGaps: true }]);
+}
+
+function renderRankSelectors() {
+  const kindSel = $("rank-kind"), prev = kindSel.value || 0;
+  kindSel.innerHTML = RANKS.map((r, i) => `<option value="${i}">${r[1]}</option>`).join("");
+  kindSel.value = prev;
+  kindSel.onchange = () => { rankStock = null; fillSnaps(); };
+  fillSnaps();
+}
+function fillSnaps() {
+  const [kind] = RANKS[$("rank-kind").value], hist = D[kind];
+  $("rank-snap").innerHTML = hist.map((s, i) => `<option value="${i}">${fmtTs(s.ts)}</option>`).reverse().join("");
+  $("rank-snap").onchange = renderRank;
+  renderRank();
+}
+function renderRank() {
+  const [kind, , pick, valKey, valLabel] = RANKS[$("rank-kind").value], hist = D[kind];
+  const snap = hist[$("rank-snap").value];
+  const rows = snap ? pick(snap.data) || [] : [];
+  const fmtVal = valKey === "volume" ? v => num(v, 0) + "주" : valKey.startsWith("week52") ? v => num(v, 0) + "원" : amount;
+  $("rank-table").innerHTML = rows.length ? `<tr><th>#</th><th>종목</th><th>현재가</th><th>등락률</th><th>${valLabel}</th></tr>` +
+    rows.map((s, i) => `<tr><td>${s.rank ?? i + 1}</td><td class="name" data-n="${esc(s.name)}">${esc(s.name)}</td>
+      <td>${num(s.price, 0)}</td><td class="${cls(s.change_pct)}">${pct(s.change_pct)}</td><td>${fmtVal(s[valKey])}</td></tr>`).join("")
+    : '<tr><td class="empty">아직 데이터가 없어요.</td></tr>';
+  $("rank-table").querySelectorAll("td.name").forEach(td => td.onclick = () => { rankStock = td.dataset.n; renderRankChart(); });
+
+  // 최근 30일 동안 이 순위에 등장한 날 수
+  const cutoff = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10), days = {};
+  hist.filter(s => s.ts.slice(0, 10) >= cutoff).forEach(s =>
+    (pick(s.data) || []).forEach(x => (days[x.name] ??= new Set()).add(s.ts.slice(0, 10))));
+  const freq = Object.entries(days).map(([n, s]) => [n, s.size]).sort((a, b) => b[1] - a[1]).slice(0, 20);
+  $("freq-sub").textContent = "최근 30일 · 등장 일수";
+  $("freq").innerHTML = freq.length ? freq.map(([n, c]) => `<button class="chip" data-n="${esc(n)}">${esc(n)}<b>${c}</b></button>`).join("")
+    : '<div class="empty">아직 데이터가 없어요.</div>';
+  $("freq").querySelectorAll(".chip").forEach(b => b.onclick = () => { rankStock = b.dataset.n; renderRankChart(); });
+  if (!rankStock && rows[0]) rankStock = rows[0].name;
+  renderRankChart();
+}
+function renderRankChart() {
+  const [kind, label, pick] = RANKS[$("rank-kind").value], hist = D[kind];
+  $("rank-chart-title").textContent = rankStock ? `${rankStock} · ${label} 순위` : "종목 순위 추이";
+  const ranks = hist.map(s => { const l = pick(s.data) || [], i = l.findIndex(x => x.name === rankStock); return i < 0 ? null : (l[i].rank ?? i + 1); });
+  lineChart("rank-chart", hist.map(s => fmtTs(s.ts)),
+    [{ data: ranks, borderColor: css("--accent"), tension: .2, pointRadius: 3, spanGaps: false, reverseY: true, label: "순위" }]);
+}
+
+function bars(el, items) {
+  const max = Math.max(1, ...items.map(([, v]) => Math.abs(v)));
+  $(el).innerHTML = items.map(([n, v]) => {
+    const w = Math.abs(v) / max * 50, left = v >= 0 ? 50 : 50 - w;
+    return `<div class="bar"><span>${esc(n)}</span><div class="track"><div class="mid"></div>
+      <div class="fill" style="left:${left}%;width:${w}%;background:var(${v >= 0 ? "--up" : "--down"})"></div></div>
+      <span class="${cls(v)}">${pct(v)}</span></div>`;
+  }).join("");
+}
+function renderUS() {
+  const hist = D.us_market, last = hist.at(-1);
+  if (!last) { $("us-comment").innerHTML = '<span class="empty">아직 데이터가 없어요.</span>'; return; }
+  $("us-ts").textContent = last.data.date;
+  $("us-comment").textContent = last.data.comment;
+  bars("us-idx", Object.entries(last.data.indices));
+  bars("us-themes", last.data.themes);
+  const names = Object.keys(last.data.indices), palette = ["#3b5bdb", "#e8590c", "#2f9e44", "#ae3ec9", "#c2255c"];
+  lineChart("us-chart", hist.map(s => s.data.date.slice(5).replace("-", "/")),
+    names.map((n, i) => ({ label: n, data: hist.map(s => s.data.indices[n] ?? null), borderColor: palette[i % 5], tension: .2, pointRadius: 2 })));
+}
+
+function renderNews() {
+  // 뉴스는 카테고리별로 발송 시각이 달라 날짜 단위로 묶어 보여준다
+  const dates = [...new Set(NEWS.flatMap(([k]) => D[k].map(s => s.ts.slice(0, 10))))].sort().reverse();
+  const sel = $("news-snap"), prev = sel.value;
+  sel.innerHTML = dates.map(d => `<option>${d}</option>`).join("");
+  if (dates.includes(prev)) sel.value = prev;
+  sel.onchange = renderNews;
+  const day = sel.value;
+  $("news-body").innerHTML = NEWS.map(([k, title]) => {
+    const snaps = D[k].filter(s => s.ts.slice(0, 10) === day).reverse();
+    const body = snaps.length ? snaps.map(s => `<div class="empty">${fmtTs(s.ts)}</div><ol>${s.data.map(a =>
+      `<li><a href="${esc(a.link)}" target="_blank" rel="noopener">${esc(a.title)}</a>${a.summary ? `<p>${esc(a.summary)}</p>` : ""}</li>`).join("")}</ol>`).join("")
+      : '<div class="empty">이 날짜에는 없어요.</div>';
+    return `<div class="card news"><h2>${title}</h2>${body}</div>`;
+  }).join("");
+}
+
+function band(x) {
+  if (x.fixPubPrice) return num(+x.fixPubPrice, 0) + "원";
+  if (!x.hopePubStart || !x.hopePubEnd) return "미정";
+  return x.hopePubStart === x.hopePubEnd ? num(+x.hopePubStart, 0) + "원" : `${num(+x.hopePubStart, 0)}~${num(+x.hopePubEnd, 0)}원`;
+}
+function renderIPO() {
+  const last = D.ipo.at(-1);
+  if (!last) return;
+  $("ipo-ts").textContent = fmtTs(last.ts);
+  const t = (rows, head, cells) => rows.length ? `<tr>${head.map(h => `<th>${h}</th>`).join("")}</tr>` +
+    rows.map(x => `<tr>${cells(x).map(c => `<td>${c}</td>`).join("")}</tr>`).join("") : '<tr><td class="empty">해당 없음</td></tr>';
+  $("ipo-wait").innerHTML = t(last.data.waiting, ["시장", "종목", "상장일", "공모가", "경쟁률", "주간사"],
+    x => [esc(x.marketType), esc(x.compName), esc(x.lcalDate || "미정"), band(x),
+      x.fnlCmptRatio ? num(+x.fnlCmptRatio) + ":1" : "미정", esc(x.orgNm)]);
+  $("ipo-up").innerHTML = t(last.data.upcoming, ["시장", "종목", "청약", "공모희망가", "업종", "주간사"],
+    x => [esc(x.marketType), esc(x.compName), `${esc(x.poStartDate || "미정")} ~ ${esc(x.poEndDate || "")}`, band(x),
+      esc(x.compUpjong || "미정"), esc(x.orgNm)]);
+}
+
+$("tabs").querySelectorAll("button").forEach(b => b.onclick = () => {
+  $("tabs").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+  document.querySelectorAll("section").forEach(s => s.classList.toggle("on", s.id === b.dataset.t));
+  Object.values(charts).forEach(c => c.resize());
+  try { localStorage.setItem("tab", b.dataset.t); } catch (e) {}
+});
+let startTab = location.hash.slice(1);
+try { startTab ||= localStorage.getItem("tab"); } catch (e) {}
+if (startTab) document.querySelector(`[data-t="${startTab}"]`)?.click();
+
+load();
+setInterval(load, 5 * 60 * 1000);
+</script>
+</body>
+</html>
