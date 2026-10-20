@@ -29,7 +29,22 @@ nav { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 8px; }
 nav button { border: 0; background: transparent; color: var(--muted); padding: 6px 12px; border-radius: 999px;
   font: inherit; cursor: pointer; white-space: nowrap; }
 nav button.on { background: var(--text); color: var(--bg); }
+nav.sub { padding-top: 0; } nav.sub:empty { display: none; }
+nav.sub button { font-size: 13px; padding: 4px 10px; }
+nav.sub button.on { background: var(--chip); color: var(--text); font-weight: 700; }
 main { padding: 16px 0 40px; }
+.cal { display: grid; grid-template-columns: repeat(5, minmax(120px, 1fr)); gap: 6px; min-width: 640px; }
+.cal .dow { color: var(--muted); font-size: 12px; text-align: center; }
+.cal .day { border: 1px solid var(--line); border-radius: 8px; padding: 6px; min-height: 84px; cursor: pointer; font-size: 12px;
+  background: var(--card); color: inherit; text-align: left; font-family: inherit; display: block; width: 100%; }
+.cal .day.on { outline: 2px solid var(--accent); }
+.cal .day.today .d { color: var(--accent); }
+.cal .day.none { opacity: .45; cursor: default; }
+.cal .d { font-weight: 700; display: flex; justify-content: space-between; }
+.cal .d small { color: var(--muted); font-weight: 400; }
+.cal .n { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.6; }
+.earn-grp h3 { font-size: 13px; margin: 6px 0; } #earn-day > .earn-grp, #earn-day .two + .earn-grp { margin-top: 14px; }
+.sym { color: var(--muted); font-size: 12px; margin-left: 4px; }
 section { display: none; } section.on { display: block; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
 .card h2 { font-size: 15px; margin: 0 0 10px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
@@ -70,20 +85,20 @@ select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid 
   <div class="top"><h1>📊 마켓 대시보드</h1><span id="updated"></span></div>
   <nav id="tabs">
     <button data-t="ind" class="on">지표</button>
-    <button data-t="rank">순위</button>
+    <button data-t="kr">한국장</button>
     <button data-t="us">미국장</button>
     <button data-t="news">뉴스</button>
-    <button data-t="ipo">공모주</button>
   </nav>
+  <nav id="subtabs" class="sub"></nav>
 </div></header>
 
 <main class="wrap">
   <section id="ind" class="on">
-    <div class="card"><h2>아침 브리핑 지표 <small id="ind-ts"></small></h2><div class="grid" id="ind-tiles"></div></div>
+    <div id="ind-groups"></div>
     <div class="card"><h2><span id="ind-chart-title">추이</span><small>브리핑 시점 기준</small></h2><div class="chartbox"><canvas id="ind-chart"></canvas></div></div>
   </section>
 
-  <section id="rank">
+  <section id="kr-rank">
     <div class="card">
       <div class="row">
         <select id="rank-kind"></select>
@@ -97,7 +112,7 @@ select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid 
     </div>
   </section>
 
-  <section id="us">
+  <section id="us-close">
     <div class="card"><h2>미국증시 마감 코멘트 <small id="us-ts"></small></h2><p id="us-comment"></p></div>
     <div class="two">
       <div class="card"><h2>지수 등락률</h2><div id="us-idx"></div></div>
@@ -106,12 +121,17 @@ select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid 
     <div class="card"><h2>지수 등락률 추이</h2><div class="chartbox"><canvas id="us-chart"></canvas></div></div>
   </section>
 
+  <section id="us-earn">
+    <div class="card"><h2><span id="earn-title">실적발표</span><small>시총 100억달러 이상 · 시간은 한국시간 기준</small></h2><div id="earn-day"></div></div>
+    <div class="card"><h2>실적발표 캘린더 <small id="earn-ts"></small></h2><div class="scroll"><div id="earn-cal"></div></div></div>
+  </section>
+
   <section id="news">
     <div class="row"><select id="news-snap"></select></div>
     <div id="news-body"></div>
   </section>
 
-  <section id="ipo">
+  <section id="kr-ipo">
     <div class="card"><h2>📋 상장대기 <small id="ipo-ts"></small></h2><div class="scroll"><table id="ipo-wait"></table></div></div>
     <div class="card"><h2>🗓 청약예정</h2><div class="scroll"><table id="ipo-up"></table></div></div>
   </section>
@@ -119,7 +139,11 @@ select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid 
 
 <script>
 const KINDS = ["briefing", "market_cap", "trading_value", "popular", "week52", "nxt_movers", "ipo",
-  "us_market", "news_FLASHNEWS", "news_MAINNEWS", "news_RANKNEWS"];
+  "us_market", "earnings", "news_FLASHNEWS", "news_MAINNEWS", "news_RANKNEWS"];
+const SUBTABS = { kr: [["kr-rank", "순위"], ["kr-ipo", "공모주"]], us: [["us-close", "마감 코멘트"], ["us-earn", "실적"]] };
+// 코인은 이름이 키라서 아래 그룹에 없는 나머지를 코인으로 본다
+const IND_GROUPS = [["🇰🇷 한국", ["kospi", "kosdaq"]], ["🇺🇸 미국", ["dow", "nasdaq", "sp500", "sox"]],
+  ["📐 기타 지표", ["us10y", "vix", "fear_greed", "usdkrw", "dxy", "wti", "gold"]], ["🪙 코인", null]];
 const IND_LABELS = { kospi: "코스피", kosdaq: "코스닥", dow: "다우존스", nasdaq: "나스닥", sp500: "S&P500",
   sox: "필라델피아반도체", us10y: "미국채10년(%)", wti: "WTI($)", gold: "금($)", vix: "VIX", usdkrw: "원/달러",
   dxy: "달러인덱스", fear_greed: "Fear & Greed", btc_dominance: "BTC 도미넌스(%)" };
@@ -144,6 +168,7 @@ const pct = v => v == null ? "" : (v >= 0 ? "+" : "") + v.toFixed(2) + "%";
 const num = (v, d = 2) => v == null ? "-" : Number(v).toLocaleString("ko-KR", { maximumFractionDigits: d });
 const fmtTs = ts => ts ? ts.slice(5, 10).replace("-", "/") + " " + ts.slice(11, 16) : "";
 const amount = w => w >= 1e12 ? (w / 1e12).toFixed(2) + "조" : w >= 1e8 ? Math.round(w / 1e8).toLocaleString() + "억" : num(w, 0);
+const usd = v => v >= 1e12 ? (v / 1e12).toFixed(2) + "조달러" : Math.round(v / 1e8).toLocaleString() + "억달러";
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
 async function load() {
@@ -153,7 +178,7 @@ async function load() {
   D = Object.fromEntries(KINDS.map((k, i) => [k, res[i]]));
   const latest = KINDS.map(k => D[k].at(-1)?.ts).filter(Boolean).sort().at(-1);
   $("updated").textContent = latest ? `최근 갱신 ${fmtTs(latest)}` : "데이터 없음";
-  renderInd(); renderRankSelectors(); renderUS(); renderNews(); renderIPO();
+  renderInd(); renderRankSelectors(); renderUS(); renderEarn(); renderNews(); renderIPO();
 }
 
 function lineChart(id, labels, datasets) {
@@ -171,12 +196,17 @@ function lineChart(id, labels, datasets) {
 
 function renderInd() {
   const hist = D.briefing, last = hist.at(-1);
-  if (!last) { $("ind-tiles").innerHTML = '<div class="empty">아직 데이터가 없어요.</div>'; return; }
-  $("ind-ts").textContent = fmtTs(last.ts);
-  $("ind-tiles").innerHTML = Object.entries(last.data).filter(([, v]) => v[0] != null).map(([k, [v, c]]) =>
+  if (!last) { $("ind-groups").innerHTML = '<div class="card empty">아직 데이터가 없어요.</div>'; return; }
+  const known = IND_GROUPS.flatMap(([, keys]) => keys || []);
+  const tile = k => { const [v, c] = last.data[k] || []; return v == null ? "" :
     `<button class="tile ${k === indKey ? "on" : ""}" data-k="${esc(k)}"><div class="k">${esc(IND_LABELS[k] || k)}</div>
-     <div class="v">${num(v)}</div><div class="${cls(c)}">${pct(c)}</div></button>`).join("");
-  $("ind-tiles").querySelectorAll(".tile").forEach(b => b.onclick = () => { indKey = b.dataset.k; renderInd(); });
+     <div class="v">${num(v)}</div><div class="${cls(c)}">${pct(c)}</div></button>`; };
+  $("ind-groups").innerHTML = IND_GROUPS.map(([title, keys], i) => {
+    keys ||= Object.keys(last.data).filter(k => !known.includes(k) && k !== "btc_dominance").concat("btc_dominance");
+    return `<div class="card"><h2>${title}${i === 0 ? ` <small>브리핑 ${fmtTs(last.ts)}</small>` : ""}</h2>
+      <div class="grid">${keys.map(tile).join("")}</div></div>`;
+  }).join("");
+  $("ind-groups").querySelectorAll(".tile").forEach(b => b.onclick = () => { indKey = b.dataset.k; renderInd(); });
   $("ind-chart-title").textContent = `${IND_LABELS[indKey] || indKey} 추이`;
   lineChart("ind-chart", hist.map(s => fmtTs(s.ts).slice(0, 5)),
     [{ data: hist.map(s => s.data[indKey]?.[0] ?? null), borderColor: css("--accent"), tension: .25, pointRadius: 2, spanGaps: true }]);
@@ -247,6 +277,49 @@ function renderUS() {
     names.map((n, i) => ({ label: n, data: hist.map(s => s.data.indices[n] ?? null), borderColor: palette[i % 5], tension: .2, pointRadius: 2 })));
 }
 
+const EARN_TIMES = [["time-pre-market", "🌅", "장 시작 전", "한국시간 밤 개장 전"], ["time-after-hours", "🌙", "장 마감 후", "한국시간 다음날 새벽"]];
+const kstToday = () => new Date(Date.now() + 9 * 36e5).toISOString().slice(0, 10);
+let earnDay = null;
+function renderEarn() {
+  const last = D.earnings.at(-1), days = last?.data || {};
+  const dates = Object.keys(days).sort();
+  if (!dates.length) { $("earn-day").innerHTML = '<div class="empty">아직 데이터가 없어요.</div>'; $("earn-cal").innerHTML = ""; return; }
+  $("earn-ts").textContent = `${fmtTs(last.ts)} 수집`;
+  const today = kstToday();
+  if (!days[earnDay]) earnDay = dates.find(d => d >= today) || dates.at(-1);
+  const wd = d => "일월화수목금토"[new Date(d + "T00:00:00Z").getUTCDay()];
+  const md = d => `${+d.slice(5, 7)}/${+d.slice(8)}`;
+
+  const rows = days[earnDay];
+  $("earn-title").textContent = `${md(earnDay)}(${wd(earnDay)}) 실적발표${earnDay === today ? " · 오늘" : ""}`;
+  const item = x => `<tr><td>${esc(x.name)}<span class="sym">${esc(x.symbol)}</span></td><td>${usd(x.cap)}</td><td>${esc(x.eps || "-")}</td></tr>`;
+  const groups = EARN_TIMES.concat([[null, "❔", "시간 미정", ""]]).map(([key, icon, label, note]) => {
+    const picked = rows.filter(x => key ? x.time === key : !EARN_TIMES.some(t => t[0] === x.time));
+    return picked.length ? `<div class="earn-grp"><h3>${icon} ${label} <span class="sym">${note} · ${picked.length}개</span></h3>
+      <div class="scroll"><table><tr><th>종목</th><th>시가총액</th><th>예상 EPS</th></tr>${picked.map(item).join("")}</table></div></div>` : "";
+  });
+  // 장 전/장 후는 나란히, 시간 미정은 아래로
+  $("earn-day").innerHTML = groups.some(Boolean)
+    ? `<div class="two">${groups[0] || "<div></div>"}${groups[1] || "<div></div>"}</div>${groups[2]}` : '<div class="empty">주요 발표 없음</div>';
+
+  // 첫 날짜가 속한 주 월요일부터 마지막 날짜까지 평일 칸을 채운다
+  const start = new Date(dates[0] + "T00:00:00Z"); start.setUTCDate(start.getUTCDate() - (start.getUTCDay() + 6) % 7);
+  const end = dates.at(-1), cells = [];
+  for (let d = start; d.toISOString().slice(0, 10) <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+    const k = d.toISOString().slice(0, 10), dow = d.getUTCDay();
+    if (dow === 0 || dow === 6) continue;
+    const list = days[k];
+    if (!list) { cells.push(`<div class="day none"><div class="d">${md(k)}</div>${k < dates[0] ? "" : "휴장"}</div>`); continue; }
+    const icon = x => (EARN_TIMES.find(t => t[0] === x.time) || [, "❔"])[1];
+    cells.push(`<button class="day ${k === earnDay ? "on" : ""} ${k === today ? "today" : ""}" data-d="${k}">
+      <div class="d">${md(k)}<small>${list.length}개</small></div>
+      ${list.slice(0, 5).map(x => `<div class="n">${icon(x)} ${esc(x.name)}</div>`).join("")}
+      ${list.length > 5 ? `<div class="n sym">+${list.length - 5}개 더</div>` : ""}</button>`);
+  }
+  $("earn-cal").innerHTML = `<div class="cal">${["월", "화", "수", "목", "금"].map(d => `<div class="dow">${d}</div>`).join("")}${cells.join("")}</div>`;
+  $("earn-cal").querySelectorAll("button.day").forEach(b => b.onclick = () => { earnDay = b.dataset.d; renderEarn(); });
+}
+
 function renderNews() {
   // 뉴스는 카테고리별로 발송 시각이 달라 날짜 단위로 묶어 보여준다
   const dates = [...new Set(NEWS.flatMap(([k]) => D[k].map(s => s.ts.slice(0, 10))))].sort().reverse();
@@ -283,15 +356,24 @@ function renderIPO() {
       esc(x.compUpjong || "미정"), esc(x.orgNm)]);
 }
 
-$("tabs").querySelectorAll("button").forEach(b => b.onclick = () => {
-  $("tabs").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
-  document.querySelectorAll("section").forEach(s => s.classList.toggle("on", s.id === b.dataset.t));
+// 탭 id: 상위 탭(ind, news) 또는 하위 탭(kr-rank 등). 상위 탭만 고르면 마지막으로 본 하위 탭으로 간다
+const lastSub = { kr: "kr-rank", us: "us-close" };
+function showTab(id) {
+  if (!document.getElementById(id) && !SUBTABS[id]) id = "ind";
+  const top = id.split("-")[0], sub = SUBTABS[top] ? (id === top ? lastSub[top] : id) : id;
+  if (SUBTABS[top]) lastSub[top] = sub;
+  $("tabs").querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.t === top));
+  $("subtabs").innerHTML = (SUBTABS[top] || []).map(([k, l]) => `<button data-t="${k}" class="${k === sub ? "on" : ""}">${l}</button>`).join("");
+  $("subtabs").querySelectorAll("button").forEach(b => b.onclick = () => showTab(b.dataset.t));
+  document.querySelectorAll("section").forEach(s => s.classList.toggle("on", s.id === sub));
   Object.values(charts).forEach(c => c.resize());
-  try { localStorage.setItem("tab", b.dataset.t); } catch (e) {}
-});
+  history.replaceState(null, "", "#" + sub);
+  try { localStorage.setItem("tab", sub); } catch (e) {}
+}
+$("tabs").querySelectorAll("button").forEach(b => b.onclick = () => showTab(b.dataset.t));
 let startTab = location.hash.slice(1);
 try { startTab ||= localStorage.getItem("tab"); } catch (e) {}
-if (startTab) document.querySelector(`[data-t="${startTab}"]`)?.click();
+showTab(startTab || "ind");
 
 load();
 setInterval(load, 5 * 60 * 1000);
