@@ -45,6 +45,10 @@ main { padding: 16px 0 40px; }
 .cal .n { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.6; }
 .earn-grp h3 { font-size: 13px; margin: 6px 0; } #earn-day > .earn-grp, #earn-day .two + .earn-grp { margin-top: 14px; }
 .sym { color: var(--muted); font-size: 12px; margin-left: 4px; }
+.idx { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.idx .v { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.flows { min-width: 170px; } .flows .k { color: var(--muted); font-size: 12px; margin-bottom: 2px; }
+.flow { display: flex; justify-content: space-between; gap: 16px; font-variant-numeric: tabular-nums; }
 section { display: none; } section.on { display: block; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
 .card h2 { font-size: 15px; margin: 0 0 10px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
@@ -101,7 +105,11 @@ select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid 
 
   <section id="kr-close">
     <div class="card"><h2>한국증시 마감 코멘트 <small id="kr-ts"></small></h2><p id="kr-comment"></p></div>
-    <div class="card"><h2>지수</h2><div class="grid" id="kr-idx"></div></div>
+    <div class="two" id="kr-idx"></div>
+    <div class="two">
+      <div class="card"><h2>코스피 투자자별 순매수 추이 <small>억원</small></h2><div class="chartbox"><canvas id="kr-flow-코스피"></canvas></div></div>
+      <div class="card"><h2>코스닥 투자자별 순매수 추이 <small>억원</small></h2><div class="chartbox"><canvas id="kr-flow-코스닥"></canvas></div></div>
+    </div>
     <div class="two">
       <div class="card"><h2>강한 테마 15 <small>구성 종목 5개 이상</small></h2><div id="kr-up"></div></div>
       <div class="card"><h2>약한 테마 15</h2><div id="kr-down"></div></div>
@@ -205,6 +213,18 @@ function lineChart(id, labels, datasets) {
   });
 }
 
+function barChart(id, labels, datasets) {
+  charts[id]?.destroy();
+  const grid = css("--line"), muted = css("--muted");
+  charts[id] = new Chart($(id), {
+    type: "bar", data: { labels, datasets },
+    options: { responsive: true, maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
+      plugins: { legend: { labels: { color: muted, boxWidth: 12 } },
+        tooltip: { callbacks: { label: c => `${c.dataset.label} ${c.raw >= 0 ? "+" : ""}${num(c.raw, 0)}억` } } },
+      scales: { x: { ticks: { color: muted }, grid: { display: false } }, y: { ticks: { color: muted }, grid: { color: grid } } } }
+  });
+}
+
 function renderInd() {
   const hist = D.briefing, last = hist.at(-1);
   if (!last) { $("ind-groups").innerHTML = '<div class="card empty">아직 데이터가 없어요.</div>'; return; }
@@ -281,9 +301,16 @@ function renderKR() {
   if (!last) { $("kr-comment").innerHTML = '<span class="empty">아직 데이터가 없어요.</span>'; return; }
   $("kr-ts").textContent = last.data.date;
   $("kr-comment").textContent = last.data.comment;
+  const flowRow = ([k, v]) => `<div class="flow"><span>${k}</span><span class="${cls(v)}">${v >= 0 ? "+" : ""}${num(v, 0)}억</span></div>`;
   $("kr-idx").innerHTML = Object.entries(last.data.indices).map(([n, x]) =>
-    `<div class="tile"><div class="k">${esc(n)}</div><div class="v">${num(x.close)}</div>
-     <div class="${cls(x.pct)}">${x.change >= 0 ? "▲" : "▼"} ${num(Math.abs(x.change))} (${pct(x.pct)})</div></div>`).join("");
+    `<div class="card"><h2>${esc(n)}</h2><div class="idx">
+      <div><div class="v">${num(x.close)}</div>
+        <div class="${cls(x.pct)}">${x.change >= 0 ? "▲" : "▼"} ${num(Math.abs(x.change))} (${pct(x.pct)})</div></div>
+      <div class="flows">${x.flows ? `<div class="k">투자자별 순매수</div>${Object.entries(x.flows).map(flowRow).join("")}` : '<div class="empty">수급 데이터 없음</div>'}</div>
+    </div></div>`).join("");
+  Object.keys(last.data.indices).forEach(n => barChart(`kr-flow-${n}`, hist.map(s => s.data.date.slice(5).replace("-", "/")),
+    ["개인", "외국인", "기관"].map((k, i) => ({ label: k, data: hist.map(s => s.data.indices[n]?.flows?.[k] ?? null),
+      backgroundColor: ["#f59f00", "#7048e8", "#12b886"][i], maxBarThickness: 36 }))));
   const themes = last.data.themes;
   bars("kr-up", themes.slice(0, 15).map(t => [t[0], t[1]]));
   bars("kr-down", themes.slice(-15).reverse().map(t => [t[0], t[1]]));
