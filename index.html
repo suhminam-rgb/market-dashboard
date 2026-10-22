@@ -71,7 +71,7 @@ th:nth-child(-n+2), td:nth-child(-n+2) { text-align: left; }
 td.name { cursor: pointer; white-space: normal; } td.name:hover { color: var(--accent); }
 .scroll { overflow-x: auto; }
 /* 줄 높이를 고정해 제목 줄(18+14+1) + 10일치(20+14+1)×10 = 383px까지만 보이고 나머지는 스크롤 */
-.flowtbl { margin-top: 12px; overflow: auto; max-height: 383px; }
+.flowtbl { overflow: auto; max-height: 383px; }
 .flowtbl th { line-height: 18px; } .flowtbl td { line-height: 20px; }
 .flowtbl th:nth-child(2), .flowtbl td:nth-child(2) { text-align: right; }
 .flowtbl tr:first-child th { position: sticky; top: 0; background: var(--card); }
@@ -116,8 +116,8 @@ select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid 
     <div class="card"><h2>한국증시 마감 코멘트 <small id="kr-ts"></small></h2><p id="kr-comment"></p></div>
     <div class="two" id="kr-idx"></div>
     <div class="two">
-      <div class="card"><h2>코스피 투자자별 순매수 추이 <small>억원 · 빨강 순매수 / 파랑 순매도 · 진한 막대가 최근일</small></h2><div class="chartbox"><canvas id="kr-flow-코스피"></canvas></div><div class="flowtbl" id="kr-flowtbl-코스피"></div></div>
-      <div class="card"><h2>코스닥 투자자별 순매수 추이 <small>억원 · 빨강 순매수 / 파랑 순매도 · 진한 막대가 최근일</small></h2><div class="chartbox"><canvas id="kr-flow-코스닥"></canvas></div><div class="flowtbl" id="kr-flowtbl-코스닥"></div></div>
+      <div class="card"><h2>코스피 투자자별 순매수 추이 <small>억원 · 빨강 순매수 / 파랑 순매도</small></h2><div class="flowtbl" id="kr-flowtbl-코스피"></div></div>
+      <div class="card"><h2>코스닥 투자자별 순매수 추이 <small>억원 · 빨강 순매수 / 파랑 순매도</small></h2><div class="flowtbl" id="kr-flowtbl-코스닥"></div></div>
     </div>
     <div class="two">
       <div class="card"><h2>강한 테마 15 <small>구성 종목 5개 이상</small></h2><div id="kr-up"></div></div>
@@ -225,19 +225,6 @@ function lineChart(id, labels, datasets) {
   });
 }
 
-function barChart(id, labels, datasets) {
-  charts[id]?.destroy();
-  const grid = css("--line"), muted = css("--muted");
-  charts[id] = new Chart($(id), {
-    type: "bar", data: { labels, datasets },
-    options: { responsive: true, maintainAspectRatio: false, // 날짜별 숫자는 아래 표에 있으니 툴팁은 가리킨 막대 하나만
-      interaction: { mode: "nearest", intersect: true },
-      plugins: { legend: { display: false },
-        tooltip: { callbacks: { label: c => `${c.dataset.label} ${c.raw >= 0 ? "+" : ""}${num(c.raw, 0)}억 ${c.raw >= 0 ? "순매수" : "순매도"}` } } },
-      scales: { x: { ticks: { color: muted }, grid: { display: false } }, y: { ticks: { color: muted }, grid: { color: grid } } } }
-  });
-}
-
 function renderInd() {
   const hist = D.briefing, last = hist.at(-1);
   if (!last) { $("ind-groups").innerHTML = '<div class="card empty">아직 데이터가 없어요.</div>'; return; }
@@ -321,17 +308,11 @@ function renderKR() {
         <div class="${cls(x.pct)}">${x.change >= 0 ? "▲" : "▼"} ${num(Math.abs(x.change))} (${pct(x.pct)})</div></div>
       <div class="flows">${x.flows ? `<div class="k">투자자별 순매수</div>${Object.entries(x.flows).map(flowRow).join("")}` : '<div class="empty">수급 데이터 없음</div>'}</div>
     </div></div>`).join("");
-  // 투자자별로 묶고 그 안에서 날짜순(최근 20일) 막대. 순매수 빨강, 순매도 파랑, 오래된 날일수록 옅게
-  const recent = hist.filter(s => Object.values(s.data.indices).some(x => x.flows)).slice(-20);
-  const up = css("--up"), down = css("--down");
-  Object.keys(last.data.indices).forEach(n => barChart(`kr-flow-${n}`, ["개인", "외국인", "기관"],
-    recent.map((s, i) => ({ label: s.data.date.slice(5).replace("-", "/"),
-      data: ["개인", "외국인", "기관"].map(k => s.data.indices[n]?.flows?.[k] ?? null),
-      backgroundColor: c => (c.raw >= 0 ? up : down) + (i === recent.length - 1 ? "" : "88"), maxBarThickness: 36 }))));
-  // 차트 아래 날짜별 표(최근일이 위)
+  const flowDays = hist.filter(s => Object.values(s.data.indices).some(x => x.flows));
+  // 날짜별 표(최근일이 위)
   const flowCell = v => `<td class="${cls(v)}">${v == null ? "-" : `${v >= 0 ? "+" : ""}${num(v, 0)}`}</td>`;
   Object.keys(last.data.indices).forEach(n => $(`kr-flowtbl-${n}`).innerHTML =
-    `<table><tr><th>날짜</th><th>개인</th><th>외국인</th><th>기관</th></tr>${recent.slice().reverse().map(s =>
+    `<table><tr><th>날짜</th><th>개인</th><th>외국인</th><th>기관</th></tr>${flowDays.slice().reverse().map(s =>
       `<tr><td>${s.data.date.slice(5).replace("-", "/")}</td>${["개인", "외국인", "기관"].map(k => flowCell(s.data.indices[n]?.flows?.[k])).join("")}</tr>`).join("")}</table>`);
   const themes = last.data.themes;
   bars("kr-up", themes.slice(0, 15).map(t => [t[0], t[1]]));
