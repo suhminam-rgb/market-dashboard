@@ -24,6 +24,8 @@ header { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bot
 .wrap { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
 .top { display: flex; align-items: center; justify-content: space-between; padding: 12px 0 6px; gap: 8px; }
 h1 { font-size: 18px; margin: 0; }
+.title { display: flex; align-items: baseline; gap: 4px 12px; flex-wrap: wrap; }
+#today { font-size: 16px; font-weight: 800; }
 #updated { color: var(--muted); font-size: 12px; }
 nav { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 8px; }
 nav button { border: 0; background: transparent; color: var(--muted); padding: 6px 12px; border-radius: 999px;
@@ -94,7 +96,7 @@ select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid 
 </head>
 <body>
 <header><div class="wrap">
-  <div class="top"><h1>📊 마켓 대시보드</h1><span id="updated"></span></div>
+  <div class="top"><div class="title"><h1>📊 마켓 대시보드</h1><span id="today"></span></div><span id="updated"></span></div>
   <nav id="tabs">
     <button data-t="ind" class="on">지표</button>
     <button data-t="kr">한국장</button>
@@ -204,6 +206,8 @@ async function load() {
     fetch(`data/${k}.json?t=${t}`).then(r => r.ok ? r.json() : []).catch(() => [])));
   D = Object.fromEntries(KINDS.map((k, i) => [k, res[i]]));
   const latest = KINDS.map(k => D[k].at(-1)?.ts).filter(Boolean).sort().at(-1);
+  const now = new Date(Date.now() + 9 * 36e5);  // KST
+  $("today").textContent = `${now.getUTCFullYear()}년 ${now.getUTCMonth() + 1}월 ${now.getUTCDate()}일 ${"일월화수목금토"[now.getUTCDay()]}요일`;
   $("updated").textContent = latest ? `최근 갱신 ${fmtTs(latest)}` : "데이터 없음";
   renderInd(); renderKR(); renderRankSelectors(); renderUS(); renderEarn(); renderNews(); renderIPO();
 }
