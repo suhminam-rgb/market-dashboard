@@ -68,7 +68,9 @@ th { color: var(--muted); font-weight: 500; font-size: 12px; }
 th:nth-child(-n+2), td:nth-child(-n+2) { text-align: left; }
 td.name { cursor: pointer; white-space: normal; } td.name:hover { color: var(--accent); }
 .scroll { overflow-x: auto; }
-.flowtbl { margin-top: 12px; max-height: 260px; overflow: auto; }
+/* 줄 높이를 고정해 제목 줄(18+14+1) + 10일치(20+14+1)×10 = 383px까지만 보이고 나머지는 스크롤 */
+.flowtbl { margin-top: 12px; overflow: auto; max-height: 383px; }
+.flowtbl th { line-height: 18px; } .flowtbl td { line-height: 20px; }
 .flowtbl th:nth-child(2), .flowtbl td:nth-child(2) { text-align: right; }
 .flowtbl tr:first-child th { position: sticky; top: 0; background: var(--card); }
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
@@ -224,7 +226,8 @@ function barChart(id, labels, datasets) {
   const grid = css("--line"), muted = css("--muted");
   charts[id] = new Chart($(id), {
     type: "bar", data: { labels, datasets },
-    options: { responsive: true, maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
+    options: { responsive: true, maintainAspectRatio: false, // 날짜별 숫자는 아래 표에 있으니 툴팁은 가리킨 막대 하나만
+      interaction: { mode: "nearest", intersect: true },
       plugins: { legend: { display: false },
         tooltip: { callbacks: { label: c => `${c.dataset.label} ${c.raw >= 0 ? "+" : ""}${num(c.raw, 0)}억 ${c.raw >= 0 ? "순매수" : "순매도"}` } } },
       scales: { x: { ticks: { color: muted }, grid: { display: false } }, y: { ticks: { color: muted }, grid: { color: grid } } } }
